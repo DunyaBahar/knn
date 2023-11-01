@@ -4,8 +4,8 @@ import java.util.HashMap;
 public class InstanceBasedLearner extends SupervisedLearner {
 	DataMatrix features;
 	DataMatrix labels;
-	final int k = 3;
-	final boolean weighted = true;
+	final int k = 7;
+	final boolean weighted = false;
 	ArrayList<Integer> kNearestRowIndicies = new ArrayList<>();
 	
 	@Override
@@ -17,8 +17,10 @@ public class InstanceBasedLearner extends SupervisedLearner {
 	public ArrayList<Double> calculateDistances(double[] startPoint) {
 		kNearestRowIndicies.clear();
 		ArrayList<Double> smallestDistances = new ArrayList<>();
-		for (int i = 0; i < k; i++)
+		for (int i = 0; i < k; i++) {
 			smallestDistances.add(Double.MAX_VALUE);
+			kNearestRowIndicies.add(Integer.MAX_VALUE);
+		}
 		for (int i = 0; i < features.getRowCount(); i++) {  // iterate through every instance in the dataset
 			double[] point = features.getRow(i);
 			double distance = distance(point, startPoint);
@@ -28,6 +30,7 @@ public class InstanceBasedLearner extends SupervisedLearner {
 					smallestDistances.add(j, distance);  // add the smaller distance
 					kNearestRowIndicies.remove(j);  // remove the item at j
 					kNearestRowIndicies.add(j, i);  // add the index of the closer point
+					break;
 				}
 		}
 		return smallestDistances;
@@ -60,7 +63,6 @@ public class InstanceBasedLearner extends SupervisedLearner {
 		for (int i = 0; i < weights.size(); i++)
 			weightedDists.add(distances.get(i) * weights.get(i));
 		HashMap<Double, Double> classVotes = new HashMap<>();
-		
 		// fill classVotes map
 		for (int i = 0; i < weightedDists.size(); i++) {
 			double label = labels.getValueAt(kNearestRowIndicies.get(i), 0);
@@ -71,7 +73,6 @@ public class InstanceBasedLearner extends SupervisedLearner {
 			else 
 				classVotes.put(label, weightedDists.get(i));
 		}
-		
 		// determine class (key) with most votes (value)
 		double keyOfMaxVal = -1;
 		double maxVal = Double.MIN_VALUE;
@@ -82,8 +83,6 @@ public class InstanceBasedLearner extends SupervisedLearner {
 				maxVal = currVal;
 			}
 		}
-		// need to map the weighted distances to unique classes
-		//?? how to get my values now? Isn't map not maintaining any order?
 		arrayInWhichToPutLabels[0] = keyOfMaxVal;
 	}
 
