@@ -1,0 +1,104 @@
+import java.util.ArrayList;
+import java.util.HashMap;
+
+public class InstanceBasedLearner extends SupervisedLearner {
+	DataMatrix features;
+	DataMatrix labels;
+	final int k = 3;
+	final boolean weighted = true;
+	ArrayList<Integer> kNearestRowIndicies = new ArrayList<>();
+	
+	@Override
+	public void train(DataMatrix featuresOnlyDataMatrix, DataMatrix labelsOnlyDataMatrix) throws Exception {
+		features = featuresOnlyDataMatrix;  // shallow copy ok?
+		labels = labelsOnlyDataMatrix;
+	}
+	
+	public ArrayList<Double> calculateDistances(double[] startPoint) {
+		kNearestRowIndicies.clear();
+		ArrayList<Double> smallestDistances = new ArrayList<>();
+		for (int i = 0; i < k; i++)
+			smallestDistances.add(Double.MAX_VALUE);
+		for (int i = 0; i < features.getRowCount(); i++) {  // iterate through every instance in the dataset
+			double[] point = features.getRow(i);
+			double distance = distance(point, startPoint);
+			for (int j = 0; j < smallestDistances.size(); j++)  // for every element of the smallestDistances array:
+				if (distance < smallestDistances.get(j)) {
+					smallestDistances.remove(j);  // remove the item at j
+					smallestDistances.add(j, distance);  // add the smaller distance
+					kNearestRowIndicies.remove(j);  // remove the item at j
+					kNearestRowIndicies.add(j, i);  // add the index of the closer point
+				}
+		}
+		return smallestDistances;
+	}
+
+	// returns Euclidean distance between two points
+	// assumes startPoint is same length as point
+	private double distance(double[] point, double[] startPoint) {
+		double dist = 0;
+		for (int i = 0; i < point.length; i++) {
+			double attrDiff = point[i] - startPoint[i];
+			dist += (attrDiff * attrDiff);
+		}
+		return Math.sqrt(dist);
+	}
+
+	@Override
+	public void predictInstanceLabelsFromFeatures(double[] featureVector, double[] arrayInWhichToPutLabels)
+			throws Exception {
+		// calculate all the distances and save the k closest ones (smallest distance) somewhere
+		// for categorical attribute values, 1 or 0 are the values. 
+		// data should be normalized to within the range 0-1. 
+		// if weighting, calculate the weights of the k nearest points, else weight = 1
+		// calculate the votes for those k nearest points (weighting optional)
+		// sum the votes per each class
+		// return highest-vote class
+		ArrayList<Double> distances = calculateDistances(featureVector);
+		ArrayList<Double> weights = calculateWeights(distances);
+		ArrayList<Double> weightedDists = new ArrayList<>();   // indicies still align with global kNearestNeighborsIndicies
+		for (int i = 0; i < weights.size(); i++)
+			weightedDists.add(distances.get(i) * weights.get(i));
+		HashMap<Double, Double> classVotes = new HashMap<>();
+		
+		// fill classVotes map
+		for (int i = 0; i < weightedDists.size(); i++) {
+			double label = labels.getValueAt(kNearestRowIndicies.get(i), 0);
+			if (classVotes.containsKey(label)) {
+				double currValue = classVotes.get(label);
+				classVotes.put(label, currValue + weightedDists.get(i));
+			}
+			else 
+				classVotes.put(label, weightedDists.get(i));
+		}
+		
+		// determine class (key) with most votes (value)
+		double keyOfMaxVal = -1;
+		double maxVal = Double.MIN_VALUE;
+		for (Double key : classVotes.keySet()) {
+			double currVal = classVotes.get(key);
+			if (keyOfMaxVal == -1 || currVal > maxVal) {
+				keyOfMaxVal = key;
+				maxVal = currVal;
+			}
+		}
+		// need to map the weighted distances to unique classes
+		//?? how to get my values now? Isn't map not maintaining any order?
+		arrayInWhichToPutLabels[0] = keyOfMaxVal;
+	}
+
+	// returns a list of weights who's indices correspond to the distances array parameter
+	// assumes there are no distances of 0 (division by zero)
+	private ArrayList<Double> calculateWeights(ArrayList<Double> distances) {
+		ArrayList<Double> weights = new ArrayList<>();
+		if (!weighted)
+			for (int i = 0; i < distances.size(); i++)
+				weights.add(1.0);
+		else
+			for (int i = 0; i < distances.size(); i++) {
+				double dist = distances.get(i);
+				weights.add( 1 / (dist * dist) );
+			}
+		return weights;
+	}
+}
